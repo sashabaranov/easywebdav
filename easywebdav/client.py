@@ -1,4 +1,5 @@
 import requests
+from requests.adapters import HTTPAdapter
 import platform
 from numbers import Number
 import xml.etree.cElementTree as xml
@@ -58,11 +59,12 @@ class OperationFailed(WebdavException):
         PROPFIND = "list directory",
         )
 
-    def __init__(self, method, path, expected_code, actual_code):
+    def __init__(self, method, path, expected_code, actual_code, history):
         self.method = method
         self.path = path
         self.expected_code = expected_code
         self.actual_code = actual_code
+        self.history = "->".join([str((r.status_code, r.url)) for r in history])
         operation_name = self._OPERATIONS[method]
         self.reason = 'Failed to {operation_name} "{path}"'.format(**locals())
         expected_codes = (expected_code,) if isinstance(expected_code, Number) else expected_code
@@ -72,7 +74,8 @@ class OperationFailed(WebdavException):
 {self.reason}.
   Operation     :  {method} {path}
   Expected code :  {expected_codes_str}
-  Actual code   :  {actual_code} {actual_code_str}'''.format(**locals())
+  Actual code   :  {actual_code} {actual_code_str}
+  History       :  {history}'''.format(**locals())
         super(OperationFailed, self).__init__(msg)
 
 class Client(object):
@@ -87,6 +90,7 @@ class Client(object):
         self.session = requests.session()
         self.session.verify = verify_ssl
         self.session.stream = True
+        self.session.mount(host, HTTPAdapter(max_retries=5))
 
         if cert:
             self.session.cert = cert
@@ -101,7 +105,7 @@ class Client(object):
         response = self.session.request(method, url, allow_redirects=True, **kwargs)
         if isinstance(expected_code, Number) and response.status_code != expected_code \
             or not isinstance(expected_code, Number) and response.status_code not in expected_code:
-            raise OperationFailed(method, path, expected_code, response.status_code)
+            raise OperationFailed(method, path, expected_code, response.status_code, response.history)
         return response
 
     def _get_url(self, path):

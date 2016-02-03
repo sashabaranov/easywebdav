@@ -8,7 +8,7 @@ with open(_IN_PACKAGE_DIR("__version__.py")) as version_file:
     exec(version_file.read())
 
 properties = dict(
-    name="easywebdav",
+    name="easywebdav-dcache",
     classifiers = [
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
